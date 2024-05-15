@@ -4,7 +4,7 @@ import { resampleAndMakeMono, melSpectrogram } from "../utils/audio_utils";
 import * as tf from "@tensorflow/tfjs";
 
 /*
- * This component is focused on processing the audio data.
+ * This component is focused on processing the audio data and detecting specific keywords.
  */
 
 function AudioProcessor() {
@@ -13,7 +13,6 @@ function AudioProcessor() {
   const [tfModel, setTfModel] = useState();
 
   const classes = ["hey", "fourth", "brain", "oov"];
-  const wakeWords = ["hey", "fourth", "brain"];
   const bufferSize = 1024;
   const channels = 1;
   const windowSize = 750;
@@ -28,14 +27,11 @@ function AudioProcessor() {
   const numOfBatches = 2;
   const windowBufferSize = (windowSize / 1000) * sampleRate;
 
-  let predictWords = [];
-  let targetState = 0;
-  let bufferMap = {};
-
   useEffect(() => {
     async function loadModel() {
       try {
-        const loadedModel = await tf.loadGraphModel("model/wakewords.json");
+        const loadedModel = await tf.loadGraphModel("model/model.json");
+        console.log(loadedModel);
 
         setTfModel(loadedModel);
         console.log("Model loaded successfully!");
@@ -67,14 +63,10 @@ function AudioProcessor() {
           i = i + windowBufferSize
         ) {
           let batchBuffer = arrayBuffer.current.slice(i, i + windowBufferSize);
-          //  if it is less than 750 ms then pad it with ones
           if (batchBuffer.length < windowBufferSize) {
-            //batchBuffer = padArray(batchBuffer, windowBufferSize, 1)
-            // discard last slice
             break;
           }
 
-          // calculate log mels
           const log_mels = melSpectrogram(batchBuffer, {
             sampleRate: sampleRate,
             hopLength: SPEC_HOP_LENGTH,
@@ -90,7 +82,7 @@ function AudioProcessor() {
           dataProcessed = [...dataProcessed, ...flatten(log_mels)];
           batch = batch + 1;
         }
-        // console.log("dataProcessed", dataProcessed);
+
         arrayBuffer.current = [];
         // Run model with Tensor inputs and get the result.
         let outputTensor = tf.tidy(() => {
@@ -104,12 +96,19 @@ function AudioProcessor() {
             ],
             "float32"
           );
-          console.log("Input Tensor:", inputTensor);
 
-          let outputTensor = tfModel.predict(inputTensor); /// THIS IS WHERE IT GOES WRONG
-          console.log("Output Tensor:", outputTensor);
-          return outputTensor;
+          return tfModel.predict(inputTensor);
         });
+
+        let outputData = await outputTensor.data();
+        for (let i = 0; i < outputData.length; i = i + classes.length) {
+          let scores = Array.from(outputData.slice(i, i + classes.length));
+          let probs = softmax(scores);
+          let class_idx = argMax(probs);
+          console.log("class_idx", class_idx);
+          let predictedWord = classes[class_idx];
+          console.log("Predicted word", predictedWord);
+        }
       }
     }
 
@@ -126,6 +125,27 @@ function AudioProcessor() {
       }
     }
     return flatten_arry;
+  }
+
+  function softmax(arr) {
+    return arr.map(function (value, index) {
+      return (
+        Math.exp(value) /
+        arr
+          .map(function (y) {
+            return Math.exp(y);
+          })
+          .reduce(function (a, b) {
+            return a + b;
+          })
+      );
+    });
+  }
+
+  function argMax(array) {
+    return array
+      .map((x, i) => [x, i])
+      .reduce((r, a) => (a[0] > r[0] ? a : r))[1];
   }
 
   return null;

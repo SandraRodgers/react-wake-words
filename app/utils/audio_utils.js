@@ -47,7 +47,7 @@ export async function resampleAndMakeMono(audioBuffer, targetSr = SAMPLE_RATE) {
   const sourceSr = audioBuffer.sampleRate;
   const lengthRes = (audioBuffer.length * targetSr) / sourceSr;
   if (!isSafari) {
-    console.log("Resampling with WebAudio.", audioBuffer.numberOfChannels);
+    // console.log("Resampling with WebAudio.", audioBuffer.numberOfChannels);
     const _offlineCtx = new OfflineAudioContext(
       audioBuffer.numberOfChannels,
       audioBuffer.duration * targetSr,
