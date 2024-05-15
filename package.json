@@ -1,5 +1,5 @@
 {
-  "name": "audio-app",
+  "name": "react-wake-words",
   "version": "0.1.0",
   "private": true,
   "scripts": {
